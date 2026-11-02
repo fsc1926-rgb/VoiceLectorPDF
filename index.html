@@ -3,19 +3,17 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CarPDF Studio Pro</title>
+  <title>CarPDF Elite</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#000000">
+  
+  <!-- Librerie Esterne -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+  <!-- Motore OCR Tesseract -->
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
+  
   <style>
-    :root {
-      --bg: #000000;
-      --card: #121212;
-      --accent: #38bdf8;
-      --accent-green: #4ade80;
-      --text: #f8fafc;
-      --muted: #94a3b8;
-    }
+    :root { --bg: #000; --card: #121212; --accent: #38bdf8; --accent-green: #4ade80; --text: #f8fafc; --muted: #94a3b8; }
     * { box-sizing: border-box; margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
     body { background: var(--bg); color: var(--text); padding: 12px; min-height: 100vh; display: flex; flex-direction: column; gap: 10px; }
     
@@ -28,39 +26,39 @@
     input[type="file"] { display: none; }
     .btn-upload { display: block; width: 100%; text-align: center; background: var(--accent); color: #000; font-weight: 700; padding: 12px; border-radius: 10px; cursor: pointer; font-size: 0.95rem; }
     
-    .settings-grid { display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-top: 10px; }
+    .settings-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
     select { width: 100%; padding: 8px; border-radius: 8px; background: #1a1a1a; color: var(--text); border: 1px solid #333; font-size: 0.85rem; }
+    .full-width { grid-column: span 2; }
 
-    /* Area Guida e Pixel Shifting */
+    /* Area Guida (Schermo Nero) */
     .car-mode-screen { background: #080808; border: 2px dashed #333; border-radius: 14px; padding: 16px; text-align: center; cursor: pointer; min-height: 140px; display: flex; flex-direction: column; justify-content: center; align-items: center; gap: 8px; transition: transform 0.5s ease; }
-    .car-mode-screen:active { background: #1a1a1a; }
     .status-info { font-size: 0.85rem; color: var(--muted); }
     .main-action-text { font-size: 1.3rem; font-weight: 800; color: var(--accent-green); }
-    .mic-status { font-size: 0.75rem; color: #ef4444; font-weight: bold; margin-top: 4px; display: none; }
 
     .car-controls { display: grid; grid-template-columns: 1fr 1.5fr 1fr; gap: 10px; margin-top: 10px; }
     .btn-car { border: none; border-radius: 12px; padding: 18px 8px; font-size: 1rem; font-weight: 700; cursor: pointer; color: var(--text); background: #222; }
     .btn-play { background: var(--accent-green); color: #000; font-size: 1.2rem; }
 
     .toolbar-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
-    .btn-tool { flex: 1 1 30%; padding: 10px 4px; background: #1a1a1a; border: 1px solid #333; color: var(--text); border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: center; }
+    .btn-tool { flex: 1 1 30%; padding: 10px 4px; background: #1a1a1a; border: 1px solid #333; color: var(--text); border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
     .btn-export { background: #047857; color: white; border: none; }
 
-    /* Visualizzatore e Segnalibri */
     .text-box { max-height: 120px; overflow-y: auto; font-size: 0.9rem; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap; margin-top: 8px; }
-    .bookmarks-container { max-height: 100px; overflow-y: auto; font-size: 0.8rem; color: var(--muted); margin-top: 6px; border-top: 1px solid #222; padding-top: 6px; }
   </style>
 </head>
 <body>
 
+  <!-- Audio Invisibile per forzare la riproduzione a schermo spento -->
+  <audio id="silent-audio" loop src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"></audio>
+
   <header>
-    <h1>🚗 CarPDF Pro</h1>
+    <h1>🚗 CarPDF Elite</h1>
     <span id="ai-status" class="badge">Analisi AI...</span>
   </header>
 
   <div class="card">
     <label class="btn-upload">
-      📂 Seleziona o Cambia PDF
+      📂 Seleziona PDF
       <input type="file" id="pdf-upload" accept="application/pdf">
     </label>
     <div class="settings-grid">
@@ -71,6 +69,7 @@
         <option value="1.15">1.15x Fluido</option>
         <option value="1.3">1.3x Veloce</option>
       </select>
+      <select id="toc-select" class="full-width"><option value="">📑 Indice Capitoli...</option></select>
     </div>
   </div>
 
@@ -79,120 +78,69 @@
       <div class="status-info" id="book-title">Nessun libro caricato</div>
       <div class="main-action-text" id="big-status-label">PRONTO</div>
       <div class="status-info" id="page-indicator">Pag. 0 / 0</div>
-      <div class="mic-status" id="mic-indicator">🎙️ In ascolto comandi vocali...</div>
     </div>
 
     <div class="car-controls">
-      <button class="btn-car" id="prev-btn">⏮ Indietro</button>
+      <button class="btn-car" id="prev-btn">⏮ Ind</button>
       <button class="btn-car btn-play" id="play-btn">▶ LEGGI</button>
-      <button class="btn-car" id="next-btn">Avanti ⏭</button>
+      <button class="btn-car" id="next-btn">Av ⏭</button>
     </div>
 
     <div class="toolbar-row">
-      <button class="btn-tool" id="summary-btn">🎓 Spiega (AI)</button>
-      <button class="btn-tool" id="mic-btn">🎙️ Comandi Vocali</button>
-      <button class="btn-tool" id="bookmark-btn">📌 Segnalibro</button>
-      <button class="btn-tool btn-export" id="export-btn">📤 Esporta Appunti</button>
+      <button class="btn-tool" id="summary-btn">🎓 Spiega</button>
+      <button class="btn-tool" id="bookmark-btn">📌 Appunto</button>
+      <button class="btn-tool btn-export" id="export-btn">📤 Esporta</button>
     </div>
   </div>
 
   <div class="card" style="flex: 1;">
-    <div id="text-display" class="text-box">Carica un PDF. La libreria, i segnalibri e il progresso si salvano in automatico.</div>
-    <div class="bookmarks-container" id="bookmarks-list"><strong>Segnalibri salvati:</strong> Nessuno</div>
+    <div id="text-display" class="text-box">Carica un file. L'app ricorderà la pagina e la frase esatta in automatico.</div>
   </div>
 
 <script>
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  let pdfDoc = null;
-  let currentPage = 1;
-  let totalPages = 0;
-  let cleanSentences = [];
-  let currentSentenceIndex = 0;
-  let isPlaying = false;
-  let currentFileName = "";
-  let db = null;
-  let bookmarks = [];
-  let synth = window.speechSynthesis;
-  let voices = [];
-  let hasBuiltInAI = false;
+  let pdfDoc = null, currentPage = 1, totalPages = 0, cleanSentences = [], currentSentenceIndex = 0;
+  let isPlaying = false, currentFileName = "", db = null, bookmarks = [];
+  let synth = window.speechSynthesis, voices = [], hasBuiltInAI = false;
 
   const playBtn = document.getElementById('play-btn');
   const prevBtn = document.getElementById('prev-btn');
   const nextBtn = document.getElementById('next-btn');
   const summaryBtn = document.getElementById('summary-btn');
-  const micBtn = document.getElementById('mic-btn');
   const bookmarkBtn = document.getElementById('bookmark-btn');
   const exportBtn = document.getElementById('export-btn');
   const touchPad = document.getElementById('touch-pad');
   const textDisplay = document.getElementById('text-display');
   const pageIndicator = document.getElementById('page-indicator');
-  const bookTitle = document.getElementById('book-title');
   const bigStatusLabel = document.getElementById('big-status-label');
-  const voiceSelect = document.getElementById('voice-select');
-  const rateSelect = document.getElementById('rate-select');
-  const bookmarksList = document.getElementById('bookmarks-list');
-  const aiStatusLabel = document.getElementById('ai-status');
-  const micIndicator = document.getElementById('mic-indicator');
+  const tocSelect = document.getElementById('toc-select');
+  const silentAudio = document.getElementById('silent-audio');
 
-  // Controllo AI Nativa (Gemini Nano via window.ai)
+  // Controllo Gemini Nano
   async function checkNativeAI() {
     if ('ai' in self && 'summarizer' in self.ai) {
       const capabilities = await self.ai.summarizer.capabilities();
       if (capabilities && capabilities.available !== 'no') {
         hasBuiltInAI = true;
-        aiStatusLabel.textContent = "🧠 Gemini Nano Attivo";
-        aiStatusLabel.style.color = "#a855f7"; // Viola AI
-        return;
+        document.getElementById('ai-status').textContent = "🧠 Gemini Attivo";
       }
-    }
-    aiStatusLabel.textContent = "⚙️ Motore Standard";
+    } else { document.getElementById('ai-status').textContent = "⚙️ Base"; }
   }
   checkNativeAI();
 
-  // Inizializzazione IndexedDB
-  const request = indexedDB.open('CarPDFDB_Pro', 1);
-  request.onupgradeneeded = (e) => {
-    db = e.target.result;
-    if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'name' });
-  };
-  request.onsuccess = (e) => { db = e.target.result; loadLastBook(); };
-
-  function savePDFToDB(file, arrayBuffer) {
-    if (!db) return;
-    const tx = db.transaction('files', 'readwrite');
-    tx.objectStore('files').put({ name: file.name, data: arrayBuffer });
-  }
-
-  function loadLastBook() {
-    if (!db) return;
-    const tx = db.transaction('files', 'readonly');
-    const store = tx.objectStore('files');
-    const req = store.getAll();
-    req.onsuccess = async () => {
-      const items = req.result;
-      if (items.length > 0) {
-        const last = items[items.length - 1];
-        currentFileName = last.name;
-        bookTitle.textContent = currentFileName.substring(0, 22);
-        pdfDoc = await pdfjsLib.getDocument({ data: last.data }).promise;
-        totalPages = pdfDoc.numPages;
-        const savedPage = localStorage.getItem(`page_${currentFileName}`);
-        currentPage = savedPage ? parseInt(savedPage, 10) : 1;
-        loadBookmarks();
-        await loadPage(currentPage);
-      }
-    };
-  }
+  // Inizializzazione DB
+  const request = indexedDB.open('CarPDFDB_Elite', 1);
+  request.onupgradeneeded = e => { db = e.target.result; if (!db.objectStoreNames.contains('files')) db.createObjectStore('files', { keyPath: 'name' }); };
+  request.onsuccess = e => { db = e.target.result; loadLastBook(); };
 
   function populateVoices() {
     voices = synth.getVoices().filter(v => v.lang.startsWith('it') || v.lang.startsWith('en'));
+    const voiceSelect = document.getElementById('voice-select');
     voiceSelect.innerHTML = '';
     voices.forEach((v, i) => {
-      const opt = document.createElement('option');
-      opt.value = i;
-      opt.textContent = `${v.name} (${v.lang})`;
-      if (v.lang.startsWith('it') && (v.name.includes('Natural') || v.name.includes('Premium') || v.name.includes('Siri') || v.name.includes('Google'))) opt.selected = true;
+      const opt = document.createElement('option'); opt.value = i; opt.textContent = `${v.name} (${v.lang})`;
+      if (v.lang.startsWith('it') && (v.name.includes('Natural') || v.name.includes('Google'))) opt.selected = true;
       voiceSelect.appendChild(opt);
     });
   }
@@ -200,20 +148,75 @@
   if (speechSynthesis.onvoiceschanged !== undefined) speechSynthesis.onvoiceschanged = populateVoices;
 
   document.getElementById('pdf-upload').addEventListener('change', async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+    const file = e.target.files[0]; if (!file) return;
     currentFileName = file.name;
-    bookTitle.textContent = currentFileName.substring(0, 22);
+    document.getElementById('book-title').textContent = currentFileName.substring(0, 22);
     const arrayBuffer = await file.arrayBuffer();
-    savePDFToDB(file, arrayBuffer);
+    if(db) db.transaction('files', 'readwrite').objectStore('files').put({ name: file.name, data: arrayBuffer });
+    
     pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     totalPages = pdfDoc.numPages;
-    currentPage = 1;
-    loadBookmarks();
+    await loadOutline();
+    
+    // Micro-Resume: Recupera posizione esatta (Pagina e Frase)
+    const pos = JSON.parse(localStorage.getItem(`pos_${currentFileName}`));
+    currentPage = pos ? pos.p : 1;
     await loadPage(currentPage);
+    if(pos && pos.s) currentSentenceIndex = pos.s;
   });
 
-  // SMART COLUMN DETECTION e PULIZIA
+  function loadLastBook() {
+    if (!db) return;
+    const req = db.transaction('files', 'readonly').objectStore('files').getAll();
+    req.onsuccess = async () => {
+      const items = req.result;
+      if (items.length > 0) {
+        const last = items[items.length - 1];
+        currentFileName = last.name;
+        document.getElementById('book-title').textContent = currentFileName.substring(0, 22);
+        pdfDoc = await pdfjsLib.getDocument({ data: last.data }).promise;
+        totalPages = pdfDoc.numPages;
+        await loadOutline();
+        
+        const pos = JSON.parse(localStorage.getItem(`pos_${currentFileName}`));
+        currentPage = pos ? pos.p : 1;
+        await loadPage(currentPage);
+        if(pos && pos.s) currentSentenceIndex = pos.s;
+      }
+    };
+  }
+
+  // Estrazione Indice dei Capitoli
+  async function loadOutline() {
+    const outline = await pdfDoc.getOutline();
+    tocSelect.innerHTML = '<option value="">📑 Indice Capitoli...</option>';
+    if (!outline) return;
+    const addItems = (items, prefix = "") => {
+      items.forEach(item => {
+        let opt = document.createElement('option');
+        opt.textContent = prefix + item.title;
+        opt.value = JSON.stringify(item.dest);
+        tocSelect.appendChild(opt);
+        if (item.items && item.items.length > 0) addItems(item.items, prefix + "  - ");
+      });
+    };
+    addItems(outline);
+  }
+
+  tocSelect.addEventListener('change', async (e) => {
+    if (!e.target.value) return;
+    const destStr = JSON.parse(e.target.value);
+    let dest = destStr;
+    if (typeof destStr === 'string') dest = await pdfDoc.getDestination(destStr);
+    if (dest) {
+      const pageIndex = await pdfDoc.getPageIndex(dest[0]);
+      currentPage = pageIndex + 1;
+      await loadPage(currentPage);
+      speakSentences(0);
+    }
+  });
+
+  // Estrazione Testo con Fallback OCR
   async function loadPage(pageNum) {
     if (!pdfDoc) return;
     stopSpeech();
@@ -221,50 +224,46 @@
     const viewport = page.getViewport({ scale: 1.0 });
     const textContent = await page.getTextContent();
     
-    const pageHeight = viewport.height;
-    const pageWidth = viewport.width;
-    const minYLimit = pageHeight * 0.08; 
-    const maxYLimit = pageHeight * 0.92;
-    const middleX = pageWidth / 2;
-
-    let leftCol = [];
-    let rightCol = [];
-
-    // Smistamento intelligente su due colonne
-    textContent.items.forEach(item => {
-      const x = item.transform[4];
-      const y = item.transform[5];
-      const realY = pageHeight - y;
+    let combinedText = "";
+    
+    if (textContent.items.length < 5) {
+      // OCR di Emergenza su Dispense Immagine
+      bigStatusLabel.textContent = "OCR IN CORSO...";
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      canvas.width = viewport.width; canvas.height = viewport.height;
+      await page.render({canvasContext: ctx, viewport: viewport}).promise;
       
-      if (realY > minYLimit && realY < maxYLimit) {
-        if (x < middleX) {
-          leftCol.push({ str: item.str, y: realY });
-        } else {
-          rightCol.push({ str: item.str, y: realY });
+      const { data: { text } } = await Tesseract.recognize(canvas, 'ita');
+      combinedText = text;
+      bigStatusLabel.textContent = "PRONTO";
+    } else {
+      // Column Detection Standard
+      let leftCol = [], rightCol = [];
+      const middleX = viewport.width / 2;
+      textContent.items.forEach(item => {
+        if (item.transform[5] > viewport.height * 0.08 && item.transform[5] < viewport.height * 0.92) {
+          if (item.transform[4] < middleX) leftCol.push(item);
+          else rightCol.push(item);
         }
-      }
-    });
+      });
+      leftCol.sort((a, b) => b.transform[5] - a.transform[5]);
+      rightCol.sort((a, b) => b.transform[5] - a.transform[5]);
+      combinedText = [...leftCol, ...rightCol].map(i => i.str).join(' ');
+    }
 
-    // Ordina i blocchi di ogni colonna dall'alto verso il basso e li unisce
-    leftCol.sort((a, b) => a.y - b.y);
-    rightCol.sort((a, b) => a.y - b.y);
-    const combinedText = [...leftCol, ...rightCol].map(i => i.str).join(' ');
-
-    const cleaned = combinedText
-      .replace(/-\s+/g, '')
-      .replace(/\bart\.\s*/gi, 'articolo ')
-      .replace(/\bcfr\.\s*/gi, 'confronta ')
-      .replace(/\[\d+\]/g, '')
-      .replace(/\s+/g, ' ')
-      .trim();
-
-    textDisplay.textContent = cleaned || "(Nessun testo rilevante in questa pagina)";
+    const cleaned = combinedText.replace(/-\s+/g, '').replace(/\s+/g, ' ').trim();
+    textDisplay.textContent = cleaned || "(Nessun testo rilevante)";
     pageIndicator.textContent = `Pag. ${currentPage} / ${totalPages}`;
     
     cleanSentences = cleaned.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [cleaned];
     currentSentenceIndex = 0;
-    localStorage.setItem(`page_${currentFileName}`, currentPage);
+    savePosition();
     updateMediaSession();
+  }
+
+  function savePosition() {
+    if (currentFileName) localStorage.setItem(`pos_${currentFileName}`, JSON.stringify({ p: currentPage, s: currentSentenceIndex }));
   }
 
   function speakSentences(startIndex = 0) {
@@ -274,31 +273,25 @@
     isPlaying = true;
     playBtn.textContent = "⏸ PAUSA";
     bigStatusLabel.textContent = "IN LETTURA...";
-    requestWakeLock();
+    
+    // Attiva audio invisibile per evitare stop a schermo spento
+    silentAudio.play().catch(()=>{});
 
     function playNext() {
       if (!isPlaying || currentSentenceIndex >= cleanSentences.length) {
         if (currentSentenceIndex >= cleanSentences.length && currentPage < totalPages) {
           currentPage++;
           loadPage(currentPage).then(() => speakSentences(0));
-        } else {
-          stopSpeech();
-        }
+        } else { stopSpeech(); }
         return;
       }
-
+      
+      savePosition();
       const sentence = cleanSentences[currentSentenceIndex].trim();
       const utterance = new SpeechSynthesisUtterance(sentence);
-      if (voices[voiceSelect.value]) utterance.voice = voices[voiceSelect.value];
-      let baseRate = parseFloat(rateSelect.value);
-
-      if (/si definisce|consiste in|è fondamentale|importante|significa/i.test(sentence)) {
-        utterance.rate = baseRate * 0.9;
-        utterance.pitch = 1.05;
-      } else {
-        utterance.rate = baseRate;
-      }
-
+      utterance.voice = voices[document.getElementById('voice-select').value];
+      utterance.rate = parseFloat(document.getElementById('rate-select').value) * (/si definisce|importante/i.test(sentence) ? 0.9 : 1.0);
+      
       utterance.onend = () => { currentSentenceIndex++; playNext(); };
       utterance.onerror = () => stopSpeech();
       synth.speak(utterance);
@@ -309,160 +302,70 @@
   function stopSpeech() {
     isPlaying = false;
     synth.cancel();
+    silentAudio.pause(); // Ferma audio silente
     playBtn.textContent = "▶ LEGGI";
     bigStatusLabel.textContent = "IN PAUSA";
+    savePosition();
   }
 
   playBtn.addEventListener('click', () => {
     if (!pdfDoc) return;
-    if (isPlaying) stopSpeech();
-    else speakSentences(Math.max(0, currentSentenceIndex - 2)); // Auto-Rewind
+    if (isPlaying) stopSpeech(); else speakSentences(Math.max(0, currentSentenceIndex - 1));
   });
+
   prevBtn.addEventListener('click', async () => { if (pdfDoc && currentPage > 1) { currentPage--; await loadPage(currentPage); speakSentences(0); }});
   nextBtn.addEventListener('click', async () => { if (pdfDoc && currentPage < totalPages) { currentPage++; await loadPage(currentPage); speakSentences(0); }});
 
-  // Gesti Ciechi
+  // Tocco Schermo Nero (Pixel Shifting e Gesti)
   let lastTouchTime = 0;
   touchPad.addEventListener('click', (e) => {
     const now = new Date().getTime();
     if (now - lastTouchTime < 300) { bookmarkBtn.click(); e.stopPropagation(); }
-    else {
-      if (isPlaying) stopSpeech();
-      else if (pdfDoc) speakSentences(currentSentenceIndex);
-    }
+    else { if (isPlaying) stopSpeech(); else if (pdfDoc) speakSentences(currentSentenceIndex); }
     lastTouchTime = now;
   });
+  setInterval(() => { touchPad.style.transform = `translate(${Math.floor(Math.random()*5)-2}px, ${Math.floor(Math.random()*5)-2}px)`; }, 60000);
 
-  // Pixel Shifting Anti Burn-in (Sposta il riquadro di 2-4 pixel ogni minuto)
-  setInterval(() => {
-    const shiftX = Math.floor(Math.random() * 5) - 2;
-    const shiftY = Math.floor(Math.random() * 5) - 2;
-    touchPad.style.transform = `translate(${shiftX}px, ${shiftY}px)`;
-  }, 60000);
+  // Appunti ed Esportazione
+  bookmarkBtn.addEventListener('click', () => {
+    if (!currentFileName || !cleanSentences[currentSentenceIndex]) return;
+    bookmarks.push(`[Pag. ${currentPage}] - ${cleanSentences[currentSentenceIndex]}`);
+    synth.speak(new SpeechSynthesisUtterance("Salvato."));
+  });
 
-  // Spiegazione AI / Statistica
+  exportBtn.addEventListener('click', async () => {
+    if (bookmarks.length === 0) return alert("Nessun appunto preso.");
+    const text = `Appunti ${currentFileName}\n\n${bookmarks.join('\n\n')}`;
+    if (navigator.share) await navigator.share({ title: 'Appunti', text }); else navigator.clipboard.writeText(text);
+  });
+
+  // AI Spiegazione
   summaryBtn.addEventListener('click', async () => {
     if (!cleanSentences.length) return;
     stopSpeech();
-    bigStatusLabel.textContent = "ELABORAZIONE SPIEGAZIONE...";
-    let summaryText = "";
-
+    bigStatusLabel.textContent = "SPIEGAZIONE PROF";
+    let summaryText = `Concetti chiave: ${cleanSentences[0] || ''} ... ${cleanSentences[Math.floor(cleanSentences.length / 2)] || ''}`;
     if (hasBuiltInAI) {
       try {
-        const summarizer = await self.ai.summarizer.create({ sharedContext: "Riassumi in italiano per uno studente universitario in modo discorsivo." });
-        const aiResult = await summarizer.summarize(textDisplay.textContent);
-        summaryText = "Secondo l'AI: " + aiResult;
-      } catch (err) {
-        summaryText = generateTeacherSummary();
-      }
-    } else {
-      summaryText = generateTeacherSummary();
+        const summarizer = await self.ai.summarizer.create();
+        summaryText = await summarizer.summarize(textDisplay.textContent);
+      } catch (err) {}
     }
-
-    bigStatusLabel.textContent = "SPIEGAZIONE PROF";
     const utt = new SpeechSynthesisUtterance(summaryText);
-    if (voices[voiceSelect.value]) utt.voice = voices[voiceSelect.value];
     utt.onend = () => stopSpeech();
     synth.speak(utt);
   });
 
-  function generateTeacherSummary() {
-    return `In sintesi, i punti chiave estratti sono. Primo: ${cleanSentences[0] || ''} Secondo: ${cleanSentences[Math.floor(cleanSentences.length / 2)] || ''} Infine: ${cleanSentences[cleanSentences.length - 1] || ''}`;
-  }
-
-  // Segnalibri ed Esportazione
-  bookmarkBtn.addEventListener('click', () => {
-    if (!currentFileName || !cleanSentences[currentSentenceIndex]) return;
-    const bText = `[Pag. ${currentPage}] - ${cleanSentences[currentSentenceIndex]}`;
-    bookmarks.push(bText);
-    localStorage.setItem(`bookmarks_${currentFileName}`, JSON.stringify(bookmarks));
-    renderBookmarks();
-    const utt = new SpeechSynthesisUtterance("Salvato.");
-    if (voices[voiceSelect.value]) utt.voice = voices[voiceSelect.value];
-    synth.speak(utt);
-  });
-
-  function loadBookmarks() {
-    const saved = localStorage.getItem(`bookmarks_${currentFileName}`);
-    bookmarks = saved ? JSON.parse(saved) : [];
-    renderBookmarks();
-  }
-
-  function renderBookmarks() {
-    bookmarksList.innerHTML = bookmarks.length === 0 ? "<strong>Segnalibri salvati:</strong> Nessuno" : "<strong>Segnalibri salvati:</strong><br>" + bookmarks.join('<br><br>');
-  }
-
-  exportBtn.addEventListener('click', async () => {
-    if (bookmarks.length === 0) return alert("Nessun segnalibro da esportare per questo libro.");
-    const shareText = `Appunti tratti da: ${currentFileName}\n\n${bookmarks.join('\n\n')}`;
-    
-    if (navigator.share) {
-      try {
-        await navigator.share({ title: 'Appunti CarPDF', text: shareText });
-      } catch (e) { console.log('Condivisione annullata'); }
-    } else {
-      // Fallback: copia negli appunti
-      navigator.clipboard.writeText(shareText);
-      alert("Appunti copiati. Incollali su WhatsApp o via Email.");
-    }
-  });
-
-  // Comandi Vocali (Web Speech API)
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  let recognition = null;
-  let isListening = false;
-
-  if (SpeechRecognition) {
-    recognition = new SpeechRecognition();
-    recognition.lang = 'it-IT';
-    recognition.continuous = false; // Usa short-bursts per non confondersi con la voce dell'app
-    
-    recognition.onresult = (event) => {
-      const command = event.results[0][0].transcript.toLowerCase().trim();
-      console.log("Comando vocale:", command);
-      
-      if (command.includes('pausa') || command.includes('ferma')) {
-        stopSpeech();
-      } else if (command.includes('leggi') || command.includes('riprendi') || command.includes('continua')) {
-        speakSentences(currentSentenceIndex);
-      } else if (command.includes('segnalibro') || command.includes('salva') || command.includes('appunto')) {
-        bookmarkBtn.click();
-      } else if (command.includes('spiega') || command.includes('riassumi')) {
-        summaryBtn.click();
-      }
-    };
-
-    recognition.onend = () => {
-      if (isListening) recognition.start(); // Riavvia l'ascolto se la modalità è attiva
-    };
-  }
-
-  micBtn.addEventListener('click', () => {
-    if (!recognition) return alert("Il tuo browser non supporta i comandi vocali.");
-    isListening = !isListening;
-    if (isListening) {
-      micBtn.style.backgroundColor = "#ef4444";
-      micIndicator.style.display = "block";
-      recognition.start();
-    } else {
-      micBtn.style.backgroundColor = "#1a1a1a";
-      micIndicator.style.display = "none";
-      recognition.stop();
-    }
-  });
-
-  // Media Session per volante
+  // Media Session al Volante
   function updateMediaSession() {
     if ('mediaSession' in navigator) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: `Pagina ${currentPage} / ${totalPages}`, artist: 'CarPDF Pro' });
-      navigator.mediaSession.setActionHandler('play', () => speakSentences(Math.max(0, currentSentenceIndex - 2)));
+      navigator.mediaSession.metadata = new MediaMetadata({ title: `Pagina ${currentPage} / ${totalPages}`, artist: 'CarPDF Elite' });
+      navigator.mediaSession.setActionHandler('play', () => speakSentences(currentSentenceIndex));
       navigator.mediaSession.setActionHandler('pause', () => stopSpeech());
       navigator.mediaSession.setActionHandler('previoustrack', () => prevBtn.click());
       navigator.mediaSession.setActionHandler('nexttrack', () => nextBtn.click());
     }
   }
-
-  async function requestWakeLock() { if ('wakeLock' in navigator) { try { await navigator.wakeLock.request('screen'); } catch (e) {} } }
 </script>
 </body>
 </html>
