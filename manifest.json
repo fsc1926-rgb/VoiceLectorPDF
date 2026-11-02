@@ -1,0 +1,16 @@
+{
+  "name": "CarPDF Studio - Lettore Vocale Offline",
+  "short_name": "CarPDF",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "https://cdn-icons-png.flaticon.com/512/337/337946.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}
