@@ -3,11 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CarPDF Kokoro AI</title>
+  <title>CarPDF Kokoro Ultimate</title>
   <link rel="manifest" href="manifest.json">
   <meta name="theme-color" content="#000000">
   
-  <!-- PDF.js e Tesseract.js (Gestione Testo e OCR) -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
   
@@ -39,62 +38,62 @@
     .toolbar-row { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
     .btn-tool { flex: 1 1 45%; padding: 10px 4px; background: #1a1a1a; border: 1px solid #333; color: var(--text); border-radius: 8px; font-size: 0.8rem; font-weight: 600; cursor: pointer; text-align: center;}
     
-    .text-box { max-height: 100px; overflow-y: auto; font-size: 0.9rem; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap; margin-top: 8px; }
+    .text-box { max-height: 140px; overflow-y: auto; font-size: 0.9rem; color: #cbd5e1; line-height: 1.5; white-space: pre-wrap; margin-top: 8px; }
   </style>
 </head>
 <body>
 
-  <!-- Audio Silenzioso per eludere il blocco background di Android/iOS -->
+  <!-- Audio Silenzioso per aggirare blocco background -->
   <audio id="silent-audio" loop src="data:audio/wav;base64,UklGRigAAABXQVZFZm10IBIAAAABAAEARKwAAIhYAQACABAAAABkYXRhAgAAAAEA"></audio>
 
   <header>
     <h1>🚗 CarPDF Kokoro</h1>
-    <span id="gemini-status" class="badge ai-badge">Verifica Gemini Nano...</span>
+    <span id="gemini-status" class="badge ai-badge">AI Nativa...</span>
   </header>
 
   <div class="card">
-    <label class="btn-upload">📂 Seleziona PDF <input type="file" id="pdf-upload" accept="application/pdf"></label>
+    <label class="btn-upload">📂 Seleziona o Cambia PDF <input type="file" id="pdf-upload" accept="application/pdf"></label>
   </div>
 
   <div class="card">
     <div id="touch-pad" class="car-mode-screen">
-      <div class="status-info" id="book-title">In attesa del Motore Kokoro AI...</div>
+      <div class="status-info" id="book-title">In attesa del Motore Kokoro...</div>
       <div class="main-action-text" id="big-status-label">INIZIALIZZAZIONE</div>
       <div class="status-info" id="page-indicator">Pag. 0 / 0</div>
-      <div class="mic-status" id="mic-indicator">🎙️ Microfono Sempre Attivo</div>
+      <div class="mic-status" id="mic-indicator">🎙️ Microfono in Ascolto</div>
     </div>
 
     <div class="car-controls">
-      <button class="btn-car" id="prev-btn">⏮ Ind</button>
+      <button class="btn-car" id="prev-btn">⏮ Indietro</button>
       <button class="btn-car btn-play" id="play-btn">▶ LEGGI</button>
-      <button class="btn-car" id="next-btn">Av ⏭</button>
+      <button class="btn-car" id="next-btn">Avanti ⏭</button>
     </div>
 
     <div class="toolbar-row">
-      <button class="btn-tool" id="mic-btn">🎙️ Assistente Vocale AI</button>
+      <button class="btn-tool" id="mic-btn">🎙️ Attiva Ascolto</button>
       <button class="btn-tool" id="bookmark-btn">📌 Salva Appunto</button>
     </div>
   </div>
 
   <div class="card" style="flex: 1;">
-    <div id="text-display" class="text-box">Il motore vocale scaricherà ~90MB la prima volta. Successivamente, la generazione sarà 100% offline. L'audio calcolato dallo Snapdragon sfrutta Kokoro per un timbro umano.</div>
+    <div id="text-display" class="text-box">Attendi che il download arrivi al 100% prima di caricare il PDF o premere Leggi.</div>
   </div>
 
 <script type="module">
-  // IMPORTAZIONE TRANSFORMERS.JS E MOTORE KOKORO
-  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.1.2';
+  // Usa la versione latest generica per massima compatibilità PC/Mobile
+  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
   
-  // Ottimizzazione Thread per Snapdragon
+  // PATCH PER PC SU GITHUB PAGES: Disabilita Web Worker Threading che causa blocchi CORS/COEP
   env.allowLocalModels = false;
-  env.backends.onnx.wasm.numThreads = 4;
+  env.backends.onnx.wasm.numThreads = 1;
 
   pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
   let pdfDoc = null, currentPage = 1, totalPages = 0, cleanSentences = [], currentSentenceIndex = 0;
   let isPlaying = false, currentFileName = "", bookmarks = [];
   
-  // Gestione Audio Nativa (WebAudio API)
-  let audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  // AudioContext NON viene creato all'avvio per non violare le Autoplay Policy dei PC
+  let audioCtx = null;
   let currentAudioSource = null;
   let kokoroSynthesizer = null;
   
@@ -107,12 +106,12 @@
   const silentAudio = document.getElementById('silent-audio');
   const micIndicator = document.getElementById('mic-indicator');
 
-  // --- 1. INIZIALIZZAZIONE KOKORO TTS ---
+  // --- 1. INIZIALIZZAZIONE KOKORO TTS (ANTI-CRASH) ---
   async function initKokoro() {
     try {
-      bigStatusLabel.textContent = "DOWNLOAD MODELLO...";
+      bigStatusLabel.textContent = "DOWNLOAD...";
       kokoroSynthesizer = await pipeline('text-to-speech', 'onnx-community/Kokoro-82M-v1.0-ONNX', {
-        dtype: 'q8', // Versione quantizzata ad alta efficienza per smartphone
+        dtype: 'q8',
         progress_callback: (progress) => {
           if (progress.status === 'progress' && progress.total) {
             const pct = Math.round((progress.loaded / progress.total) * 100);
@@ -122,33 +121,36 @@
       });
       bigStatusLabel.textContent = "PRONTO";
       document.getElementById('book-title').textContent = "Motore Vocale AI Attivo";
+      textDisplay.textContent = "Modello caricato con successo. Ora puoi selezionare un PDF e iniziare l'ascolto.";
     } catch (err) {
-      bigStatusLabel.textContent = "ERRORE KOKORO";
+      bigStatusLabel.textContent = "ERRORE";
+      // Questo mostrerà l'errore reale a schermo se qualcosa va storto
+      textDisplay.textContent = "Dettaglio Errore: " + err.message;
       console.error(err);
     }
   }
   
-  // Avvia il download del modello AI al caricamento della pagina
+  // Avvia il download
   initKokoro();
 
-  // --- 2. CONTROLLO GEMINI NANO (Per la conversazione) ---
+  // --- 2. CONTROLLO GEMINI NANO ---
   async function checkGemini() {
     if ('ai' in self && 'languageModel' in self.ai) {
       const caps = await self.ai.languageModel.capabilities();
       if (caps.available !== 'no') {
         hasGemini = true;
         geminiSession = await self.ai.languageModel.create({
-          systemPrompt: "Sei un tutor per uno studente universitario. Spiega i concetti in massimo 3 frasi brevi, in italiano."
+          systemPrompt: "Sei un tutor. Spiega in modo conciso, in italiano."
         });
-        document.getElementById('gemini-status').textContent = "🧠 Gemini Nano Attivo";
+        document.getElementById('gemini-status').textContent = "🧠 Gemini Attivo";
       }
     } else {
-      document.getElementById('gemini-status').textContent = "⚙️ Assistente Logico";
+      document.getElementById('gemini-status').textContent = "⚙️ Assistente Base";
     }
   }
   checkGemini();
 
-  // --- 3. LETTURA E CARICAMENTO PDF ---
+  // --- 3. GESTIONE PDF E OCR ---
   document.getElementById('pdf-upload').addEventListener('change', async (e) => {
     const file = e.target.files[0]; if (!file) return;
     currentFileName = file.name;
@@ -157,7 +159,6 @@
     pdfDoc = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
     totalPages = pdfDoc.numPages;
     
-    // Recupera posizione precedente (Micro-Resume)
     const pos = JSON.parse(localStorage.getItem(`kokoro_pos_${currentFileName}`));
     currentPage = pos ? pos.p : 1;
     await loadPage(currentPage);
@@ -170,14 +171,12 @@
     const textContent = await page.getTextContent();
     let text = textContent.items.map(i => i.str).join(' ').replace(/-\s+/g, '').replace(/\s+/g, ' ').trim();
     
-    // OCR Fallback per Dispense Scansionate
     if (text.length < 20) {
       bigStatusLabel.textContent = "OCR IN CORSO...";
       const viewport = page.getViewport({scale: 1.5});
       const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
       canvas.width = viewport.width; canvas.height = viewport.height;
-      await page.render({canvasContext: ctx, viewport: viewport}).promise;
+      await page.render({canvasContext: canvas.getContext('2d'), viewport: viewport}).promise;
       const { data: { text: ocrText } } = await Tesseract.recognize(canvas, 'ita');
       text = ocrText.replace(/\s+/g, ' ').trim();
       bigStatusLabel.textContent = "PRONTO";
@@ -186,23 +185,21 @@
     textDisplay.textContent = text || "(Nessun testo)";
     document.getElementById('page-indicator').textContent = `Pag. ${currentPage} / ${totalPages}`;
     
-    // Divisione furba in chunk brevi per non saturare la RAM durante la generazione AI
     cleanSentences = text.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [text];
     currentSentenceIndex = 0;
   }
 
-  // --- 4. GENERAZIONE AUDIO AI IN TEMPO REALE ---
+  // --- 4. MOTORE AUDIO KOKORO ---
   async function generateAndPlayAudio(textToSpeak, voiceProfile = 'it_nicola') {
     if (!kokoroSynthesizer) return;
     
-    bigStatusLabel.textContent = "GENERAZIONE AI...";
-    // Limita lunghezza massima per evitare freeze
+    bigStatusLabel.textContent = "ELABORAZIONE...";
     const safeText = textToSpeak.substring(0, 450); 
-    
     const result = await kokoroSynthesizer(safeText, { voice: voiceProfile });
     
     return new Promise((resolve) => {
-      // Sblocca il contesto audio se necessario (Policy dei browser)
+      // Inizializza o riattiva l'audioContext in modo sicuro
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (audioCtx.state === 'suspended') audioCtx.resume();
       
       const audioBuffer = audioCtx.createBuffer(1, result.audio.length, result.sampling_rate);
@@ -225,34 +222,25 @@
     isPlaying = true;
     currentSentenceIndex = startIndex;
     playBtn.textContent = "⏸ PAUSA";
-    silentAudio.play().catch(()=>{}); // Mantiene vivo il processo a schermo spento
+    silentAudio.play().catch(()=>{});
 
     while (isPlaying && currentSentenceIndex < cleanSentences.length) {
       const sentence = cleanSentences[currentSentenceIndex].trim();
-      if (sentence.length > 3) {
+      if (sentence.length > 2) {
         localStorage.setItem(`kokoro_pos_${currentFileName}`, JSON.stringify({ p: currentPage, s: currentSentenceIndex }));
-        
-        // REGIA 2 VOCI KOKORO
-        // usa 'it_isabella' (femminile) per definizioni/titoli, 'it_nicola' (maschile) per narrativa
-        const isDefinition = /si definisce|importante|attenzione/i.test(sentence) || sentence.length < 40;
-        const voiceProfile = isDefinition ? 'it_isabella' : 'it_nicola';
-        
-        // Aspetta che la frase finisca prima di generare la successiva
-        // (Il calcolo di Kokoro sullo Snapdragon 8+ è rapidissimo, creerà una pausa fisiologica naturale)
+        const voiceProfile = /si definisce|importante|attenzione/i.test(sentence) || sentence.length < 40 ? 'it_isabella' : 'it_nicola';
         await generateAndPlayAudio(sentence, voiceProfile);
       }
       if (!isPlaying) break;
       currentSentenceIndex++;
     }
 
-    if (isPlaying && currentSentenceIndex >= cleanSentences.length) {
-      if (currentPage < totalPages) {
-        currentPage++;
-        await loadPage(currentPage);
-        speakSentences(0);
-      } else {
-        stopSpeech();
-      }
+    if (isPlaying && currentSentenceIndex >= cleanSentences.length && currentPage < totalPages) {
+      currentPage++;
+      await loadPage(currentPage);
+      speakSentences(0);
+    } else if (isPlaying) {
+      stopSpeech();
     }
   }
 
@@ -267,15 +255,18 @@
     bigStatusLabel.textContent = "IN PAUSA";
   }
 
+  // PATCH PC: L'audio si sblocca qui, al clic fisico dell'utente
   playBtn.addEventListener('click', () => { 
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
     if (audioCtx.state === 'suspended') audioCtx.resume();
+    
     if (isPlaying) stopSpeech(); else speakSentences(currentSentenceIndex); 
   });
 
   document.getElementById('prev-btn').addEventListener('click', async () => { if (pdfDoc && currentPage > 1) { currentPage--; await loadPage(currentPage); speakSentences(0); }});
   document.getElementById('next-btn').addEventListener('click', async () => { if (pdfDoc && currentPage < totalPages) { currentPage++; await loadPage(currentPage); speakSentences(0); }});
 
-  // --- 5. ASSISTENTE VOCALE ATTIVO (Mic + Kokoro Isabella + Gemini Nano) ---
+  // --- 5. ASSISTENTE VOCALE E APPUNTI ---
   const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   let recognition = null;
   let isListening = false;
@@ -287,26 +278,16 @@
     
     recognition.onresult = async (event) => {
       const transcript = event.results[event.results.length - 1][0].transcript.toLowerCase();
-      
       if (transcript.includes("non ho capito") || transcript.includes("spiega") || transcript.includes("esempio")) {
         stopSpeech();
         bigStatusLabel.className = "main-action-text tutor-active";
         bigStatusLabel.textContent = "ELABORAZIONE AI...";
-        
         const contextText = cleanSentences.slice(Math.max(0, currentSentenceIndex - 1), currentSentenceIndex + 1).join(" ");
-        let answer = `Rivediamo il concetto. Ci stiamo concentrando su questo: ${contextText}`;
-        
-        if (hasGemini && geminiSession) {
-           answer = await geminiSession.prompt(`Spiega questo concetto in modo semplicissimo e con un esempio: "${contextText}"`);
-        }
-        
-        // Risposta generata con la voce di Isabella (Tutor)
+        let answer = `Ok, rivediamo questo punto: ${contextText}`;
+        if (hasGemini && geminiSession) answer = await geminiSession.prompt(`Spiega questo concetto in modo semplice: "${contextText}"`);
         await generateAndPlayAudio(answer, 'it_isabella');
-        
-        // Riprende il libro
         speakSentences(currentSentenceIndex);
-      } 
-      else if (transcript.includes("pausa") || transcript.includes("ferma")) {
+      } else if (transcript.includes("pausa") || transcript.includes("ferma")) {
         stopSpeech();
       }
     };
@@ -314,22 +295,16 @@
   }
 
   document.getElementById('mic-btn').addEventListener('click', () => {
-    if (!recognition) return alert("Riconoscimento vocale non supportato dal browser.");
+    if (!recognition) return alert("Riconoscimento vocale non supportato.");
     isListening = !isListening;
-    if (isListening) {
-      micIndicator.style.display = "block";
-      recognition.start();
-    } else {
-      micIndicator.style.display = "none";
-      recognition.stop();
-    }
+    micIndicator.style.display = isListening ? "block" : "none";
+    if (isListening) recognition.start(); else recognition.stop();
   });
 
-  // Appunti e Gesti Ciechi a schermo nero
   document.getElementById('bookmark-btn').addEventListener('click', async () => {
     if (!cleanSentences[currentSentenceIndex]) return;
     bookmarks.push(`Pag. ${currentPage}: ${cleanSentences[currentSentenceIndex]}`);
-    await generateAndPlayAudio("Appunto salvato", 'it_isabella');
+    await generateAndPlayAudio("Salvato", 'it_isabella');
   });
 
   document.getElementById('touch-pad').addEventListener('click', () => {
