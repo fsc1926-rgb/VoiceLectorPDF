@@ -80,8 +80,8 @@
   </div>
 
 <script type="module">
-  // Usa la versione latest generica per massima compatibilità PC/Mobile
-  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
+  // Usa la versione 3.8.1 specifica per forzare l'aggiornamento della cache
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
   
   // PATCH PER PC SU GITHUB PAGES: Disabilita Web Worker Threading che causa blocchi CORS/COEP
   env.allowLocalModels = false;
