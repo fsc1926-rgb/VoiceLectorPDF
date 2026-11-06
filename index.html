@@ -80,8 +80,8 @@
   </div>
 
 <script type="module">
-  // Usa la versione "@next" (Bleeding Edge) che contiene il supporto ufficiale a Kokoro
-  import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@next';
+  // Trucco anti-cache: usiamo il server esm.run e un parametro fittizio per forzare il download dell'ultimissima versione
+  import { pipeline, env } from 'https://esm.run/@huggingface/transformers@latest?v=sblocco';
   
   // PATCH PER PC SU GITHUB PAGES: Disabilita Web Worker Threading che causa blocchi CORS/COEP
   env.allowLocalModels = false;
@@ -110,8 +110,8 @@
   async function initKokoro() {
     try {
       bigStatusLabel.textContent = "DOWNLOAD...";
-      kokoroSynthesizer = await pipeline('text-to-speech', 'onnx-community/Kokoro-82M-v1.0-ONNX', {
-        dtype: 'q8',
+     kokoroSynthesizer = await pipeline('text-to-speech', 'onnx-community/Kokoro-82M-v1.0-ONNX', {
+        dtype: 'q8_0',  // <-- Modificato qui
         progress_callback: (progress) => {
           if (progress.status === 'progress' && progress.total) {
             const pct = Math.round((progress.loaded / progress.total) * 100);
