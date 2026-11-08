@@ -1,16 +1,20 @@
 {
-  "name": "CarPDF Studio - Lettore Vocale Offline",
+  "id": "./index.html",
+  "name": "CarPDF Universal - Lettore Vocale Offline",
   "short_name": "CarPDF",
+  "description": "Lettore vocale di PDF 100% offline per studiare in auto con doppia voce, riassunti e comandi al volante.",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
-  "background_color": "#0f172a",
-  "theme_color": "#0f172a",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "https://cdn-icons-png.flaticon.com/512/337/337946.png",
-      "sizes": "512x512",
-      "type": "image/png"
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
     }
   ]
 }
